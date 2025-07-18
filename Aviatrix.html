@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hex Grid with Player</title>
+<style>
+  body {
+    background: #222;
+    color: white;
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    margin: 0;
+    gap: 10px;
+  }
+  .hex-grid {
+    display: inline-block;
+    position: relative;
+  }
+  .hex-row {
+    display: flex;
+    position: relative;
+    margin-bottom: -10px;
+    column-gap: 2px;
+  }
+  .hex {
+    width: 60px;
+    height: 69.28px;
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    position: relative;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;   /* Stack lines vertically */
+    align-items: center;
+    justify-content: center;
+    text-align: center;       /* Center multi-line text */
+    font-size: 16px;          /* Slightly smaller for better fit */
+    font-weight: bold;
+  }
+  .hex-row:nth-child(even) { margin-left: 30px; }
+  .player {
+    position: absolute;
+    font-size: 24px;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 2;
+  }
+  .controls {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    background: #333;
+    padding: 10px 20px;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+  }
+  .stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 16px;
+  }
+  .stat span {
+    font-size: 18px;
+    font-weight: bold;
+    color: #ffd700;
+  }
+  button { padding: 5px 10px; font-size: 16px; cursor: pointer; border-radius: 5px; }
+  #statusMessage, #damageStatus {
+    font-size: 20px; color: #ffd700; margin-top: 10px; height: 24px;
+  }
+  #diceAnimation {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 80px; display: none; z-index: 20; animation: spinDice 0.8s ease-in-out;
+  }
+  @keyframes spinDice {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    50% { transform: translate(-50%, -50%) rotate(180deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+  }
+  #choiceModal {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.7); justify-content: center; align-items: center; z-index: 10;
+  }
+  #choiceModal div {
+    background: #333; padding: 20px; border-radius: 10px; text-align: center; width: 300px; color: white;
+  }
+  #choiceModal button {
+    margin: 5px; padding: 8px 12px; font-size: 16px; border: none; border-radius: 5px; cursor: pointer;
+  }
+  #riskBtn { background-color: #e74c3c; color: white; }
+  #safeBtn { background-color: #2ecc71; color: white; }
+  #riskBtn:hover { background-color: #c0392b; }
+  #safeBtn:hover { background-color: #27ae60; }
+</style>
+</head>
+<body>
+  <div class="controls">
+    <div class="stat">Flight Dice<br><span id="diceLeft">5</span></div>
+    <div class="stat">Moves Left<br><span id="movesLeft">0</span></div>
+    <div class="stat">Level<br><span id="levelTracker">1</span></div>
+    <div class="stat">Time<br><span id="timeTracker">0</span></div>
+    <button id="rollBtn">Roll Die</button>
+    <button id="repairBtn" style="display:none;">Repair Plane</button>
+    <button id="refuelBtn" style="display:none;">Refuel</button>
+  </div>
+  <div id="statusMessage"></div>
+  <div id="damageStatus">Plane Damage: 0</div>
+  <div class="hex-grid" id="hexGrid">
+    <div class="player" id="player">✈️</div>
+  </div>
+  <div id="diceAnimation">🎲</div>
+  <div id="choiceModal">
+    <div>
+      <p id="choiceText"></p>
+      <button id="riskBtn">Risk It</button>
+      <button id="safeBtn">Play Safe</button>
+    </div>
+  </div>
+<script>
+  const grid = document.getElementById('hexGrid');
+  const player = document.getElementById('player');
+  const diceLeftLabel = document.getElementById('diceLeft');
+  const movesLeftLabel = document.getElementById('movesLeft');
+  const levelTracker = document.getElementById('levelTracker');
+  const timeTracker = document.getElementById('timeTracker');
+  const rollBtn = document.getElementById('rollBtn');
+  const statusMessage = document.getElementById('statusMessage');
+  const damageStatus = document.getElementById('damageStatus');
+  const diceAnimation = document.getElementById('diceAnimation');
+  const repairBtn = document.getElementById('repairBtn');
+  const refuelBtn = document.getElementById('refuelBtn');
+
+  const playerFuelDie = 5;
+  const rows = 6, cols = 12;
+  let hexElements = [], playerRow = rows - 1, playerCol = 0;
+  let flightDice = playerFuelDie, movesLeft = 0, planeDamage = 0, timeElapsed = 0;
+  let cityPositions = [], windPositions = [], currentLevel = 1, gameOver = false, airportIndex = 0;
+  let lastAirport = null; // { code, name, repairTime }
+  const skyColors = ['#87ceeb', '#80c7e7', '#79c0e3', '#72b9df'];
+  const airports = [
+    { code: "BWI", name: "Thurgood Marshall Airport" },
+    { code: "JFK", name: "John F. Kennedy International" },
+    { code: "LAX", name: "Los Angeles International" },
+    { code: "ORD", name: "O'Hare International" },
+    { code: "ATL", name: "Hartsfield-Jackson Atlanta" },
+    { code: "DFW", name: "Dallas/Fort Worth International" },
+    { code: "DEN", name: "Denver International" },
+    { code: "SEA", name: "Seattle-Tacoma International" },
+    { code: "YYZ", name: "Toronto Pearson International" },
+    { code: "LHR", name: "London Heathrow" },
+    { code: "CDG", name: "Charles de Gaulle (Paris)" },
+    { code: "FRA", name: "Frankfurt Airport" },
+    { code: "DXB", name: "Dubai International" },
+    { code: "DEL", name: "Indira Gandhi International (Delhi)" },
+    { code: "HKG", name: "Hong Kong International" },
+    { code: "NRT", name: "Narita International (Tokyo)" },
+    { code: "SYD", name: "Sydney Kingsford Smith" },
+    { code: "AKL", name: "Auckland International" },
+    { code: "SCL", name: "Santiago International" },
+    { code: "GRU", name: "São Paulo–Guarulhos" },
+    { code: "EZE", name: "Buenos Aires Ezeiza" },
+    { code: "CPT", name: "Cape Town International" }
+  ];
+
+  function clearGrid() {
+    grid.innerHTML = ''; grid.appendChild(player);
+    hexElements = []; cityPositions = []; windPositions = [];
+  }
+  function getTerrainColor(type) {
+    return type === 'grass' ? '#4caf50' : type === 'desert' ? '#c2b280' : '#1e3f66';
+  }
+  function randomTerrain() {
+    const roll = Math.random(); return roll < 0.33 ? 'grass' : roll < 0.66 ? 'desert' : 'water';
+  }
+  function isTooClose(arr, r, c, minDist) {
+    return arr.some(([cr, cc]) => Math.abs(cr - r) + Math.abs(cc - c) < minDist);
+  }
+  function generateBiomeGrid() {
+    clearGrid();
+    for (let r = 0; r < rows; r++) {
+      const row = document.createElement('div'); row.className = 'hex-row';
+      const rowHexes = [];
+      for (let c = 0; c < cols; c++) {
+        const hex = document.createElement('div'); hex.className = 'hex';
+        if (r >= rows - 2) {
+          const spawnChance = getCitySpawnChance();
+          const isCity = (currentLevel === 1 && r === rows - 1 && c === 0) || (r === rows - 1 && Math.random() < spawnChance && !isTooClose(cityPositions, r, c, 3));
+          if (isCity) {
+            hex.style.backgroundColor = 'red';
+            hex.dataset.city = 'true';
+            
+            const airport = airports[airportIndex % airports.length];
+            const repairTime = getRandomRepairTime();
+            
+            hex.dataset.repairTime = repairTime;  // Store repair time for this city
+            hex.textContent = `${airport.code}\n(${repairTime})`;  // Show repair time on tile
+            hex.title = `${airport.name} - Repair: ${repairTime} time units`;
+            
+            cityPositions.push([r, c]);
+            airportIndex++;
+          } else { hex.style.backgroundColor = getTerrainColor(randomTerrain()); }
+        } else {
+          if (Math.random() < 0.2 && !isTooClose(windPositions, r, c, 5)) {
+            hex.style.backgroundColor = '#add8e6'; hex.textContent = '↺'; hex.dataset.wind = 'true'; windPositions.push([r, c]);
+          } else { hex.style.backgroundColor = skyColors[r % skyColors.length]; }
+        }
+        if (c === cols - 1 && !hex.dataset.city) hex.textContent = '>';
+         // Force the last airport into the starting position if available
+        if (lastAirport && r === playerRow && c === 0) {
+          hex.style.backgroundColor = 'red';
+          hex.dataset.city = 'true';
+          hex.dataset.repairTime = lastAirport.repairTime;
+          hex.innerHTML = `${lastAirport.code}<br>(${lastAirport.repairTime})`;
+          hex.title = `${lastAirport.name} - Repair: ${lastAirport.repairTime} time units`;
+          cityPositions.push([r, c]);
+          //continue;
+        }
+        row.appendChild(hex); rowHexes.push(hex);
+      }
+      grid.appendChild(row); hexElements.push(rowHexes);
+    }
+    setupHexEvents(); placePlayerAtHex(playerRow, playerCol);
+  }
+  function placePlayerAtHex(r, c) {
+    const targetHex = hexElements[r][c];
+    const hexRect = targetHex.getBoundingClientRect();
+    const gridRect = grid.getBoundingClientRect();
+    player.style.left = (hexRect.left - gridRect.left + hexRect.width / 2) + 'px';
+    player.style.top = (hexRect.top - gridRect.top + hexRect.height / 2) + 'px';
+  }
+  function isAdjacent(r1, c1, r2, c2) {
+    const evenRow = r1 % 2 === 0;
+    const directions = evenRow ? [[-1,0],[-1,1],[0,-1],[0,1],[1,0],[1,1]] : [[-1,-1],[-1,0],[0,-1],[0,1],[1,-1],[1,0]];
+    return directions.some(([dr, dc]) => r1 + dr === r2 && c1 + dc === c2);
+  }
+  function checkGameOver() {
+    const onCity = cityPositions.some(([r,c]) => r === playerRow && c === playerCol);
+    if (flightDice === 0 && movesLeft === 0 && !onCity) { gameOver = true; statusMessage.textContent = "Game Over! You're out of fuel."; }
+  }
+  function setupHexEvents() {
+    hexElements.forEach((row, r) => row.forEach((hex, c) => {
+      hex.addEventListener('click', async () => {
+        if (gameOver) return;
+        if (movesLeft > 0 && isAdjacent(playerRow, playerCol, r, c)) {
+          playerRow = r; playerCol = c; placePlayerAtHex(r, c);
+          movesLeft--; movesLeftLabel.textContent = movesLeft;
+          statusMessage.textContent = "";
+         if (hex.dataset.city === 'true') {
+            movesLeft = 0;
+            movesLeftLabel.textContent = movesLeft;
+
+            if (flightDice > 0) {
+              await rollForLanding();  // Perform landing roll
+            } else {
+              statusMessage.textContent = "⚠️ Crash Landing!";
+              await crashLandingRoll()
+            }
+
+            diceLeftLabel.textContent = flightDice;
+            document.getElementById('repairBtn').style.display = 'inline-block';
+            document.getElementById('refuelBtn').style.display = 'inline-block';
+
+            if (c === cols - 1) {
+              lastAirport = {
+                code: hex.textContent.split("\n")[0],
+                name: hex.title.split(" - ")[0],
+                repairTime: parseInt(hex.dataset.repairTime, 10)
+              };
+            }
+          } else {
+            document.getElementById('repairBtn').style.display = 'none';
+            document.getElementById('refuelBtn').style.display = 'none';
+          }
+          if (hex.dataset.wind === 'true') { flightDice = Math.min(flightDice + 1, 5); diceLeftLabel.textContent = flightDice; movesLeft = 0; movesLeftLabel.textContent = movesLeft;}
+          if (playerCol === cols - 1) {
+            currentLevel++; levelTracker.textContent = currentLevel;
+            statusMessage.textContent = "Reached the rightmost column! Level " + currentLevel;
+            const currentRow = playerRow; generateBiomeGrid(); playerRow = currentRow; playerCol = 0; placePlayerAtHex(playerRow, playerCol); return;
+          }
+          checkGameOver();
+        }
+      });
+    }));
+  }
+
+  async function rollForDamage() {
+    let rolls = [];
+    let escalate = true, stage = 0;
+    let totalDamage = 0;
+
+    while (escalate) {
+      stage++;
+      const damageRoll = Math.floor(Math.random() * 6) + 1;
+      await animateDiceRoll(damageRoll);
+      rolls.push(damageRoll);
+
+      if (damageRoll <= 2) {
+        // No damage on 1-2 unless escalated
+        if (stage > 1) totalDamage += (stage - 1);
+        escalate = false;
+      } else if (damageRoll <= 5) {
+        // Damage equals current stage
+        totalDamage += stage;
+        escalate = false;
+      } else {
+        // 6 -> UH OH, roll again
+        // (damage added later if failure)
+      }
+    }
+
+    if (totalDamage > 0) {
+      planeDamage += totalDamage;
+    }
+
+    damageStatus.textContent = `Plane Damage: ${planeDamage}`;
+    statusMessage.textContent = `Damage rolls: ${rolls.join(" -> ")} | ${totalDamage > 0 ? `+${totalDamage} Damage!` : "No damage."}`;
+  }
+
+  async function rollForLanding() {
+    const landingRoll = Math.floor(Math.random() * 6) + 1;
+    await animateDiceRoll(landingRoll);
+
+    if (landingRoll <= planeDamage) {
+      // Plane is damaged enough that we must roll for landing damage
+      statusMessage.textContent = `Landing roll ${landingRoll} <= damage ${planeDamage}. Forced landing damage check!`;
+      await landingDamageLoop();
+    } else if (landingRoll <= 4) {
+      // Safe landing
+      statusMessage.textContent = `Landing roll: ${landingRoll}. Landed safely!`;
+    } else {
+      // Landing roll is 5 or 6, potential for damage
+      statusMessage.textContent = `Landing roll: ${landingRoll}. Checking for landing damage...`;
+      await landingDamageLoop();
+    }
+  }
+
+  async function crashLandingRoll() {
+    let potentialDamage = 0;
+    let rolling = true;
+    let messages = [];
+
+    while (rolling) {
+      const roll = Math.floor(Math.random() * 6) + 1;
+      await animateDiceRoll(roll);
+      messages.push(roll);
+
+      if (roll === 1 && planeDamage === 0) {
+        // Only safe if the plane has zero existing damage
+        rolling = false;
+      } else if (roll === 1 && planeDamage > 0) {
+        // With damage, 1 is treated as failure (cannot safely crash land)
+        potentialDamage += 1;
+        rolling = false;
+      } else {
+        // 2-6 means damage
+        potentialDamage += 1;
+        rolling = false;
+      }
+    }
+
+    if (potentialDamage > 0) {
+      planeDamage += potentialDamage;
+      damageStatus.textContent = `Plane Damage: ${planeDamage}`;
+      statusMessage.textContent = `Crash landing rolls: ${messages.join(" -> ")} | +${potentialDamage} Damage!`;
+    } else {
+      statusMessage.textContent = `Crash landing rolls: ${messages.join(" -> ")} | Miraculously no damage!`;
+    }
+  }
+  
+  async function landingDamageLoop() {
+    let potentialDamage = 0;
+    let rolling = true;
+    let messages = [];
+
+    while (rolling) {
+      const roll = Math.floor(Math.random() * 6) + 1;
+      await animateDiceRoll(roll);
+      messages.push(roll);
+
+      if (roll <= 3) {
+        rolling = false; // Safe, no damage
+      } else if (roll === 4 || roll === 5) {
+        potentialDamage += 1; // Damage applied
+        rolling = false;
+      } else if (roll === 6) {
+        potentialDamage += 1; // Add 1 potential damage and roll again
+      }
+    }
+
+    if (potentialDamage > 0) {
+      planeDamage += potentialDamage;
+      damageStatus.textContent = `Plane Damage: ${planeDamage}`;
+      statusMessage.textContent = `Landing damage rolls: ${messages.join(" -> ")} | Damage taken: ${potentialDamage}`;
+    } else {
+      statusMessage.textContent = `Landing damage rolls: ${messages.join(" -> ")} | No damage!`;
+    }
+  }
+
+  function getCitySpawnChance() {
+    // Start at 40%
+    // Decrease chance by 5% per level, but never go below 20%
+    return Math.max(0.2, 0.4 - (currentLevel - 1) * 0.05);
+  }
+  
+  function getRandomRepairTime() {
+    const repairTimes = [4, 6, 8, 10, 16, 24];
+    return repairTimes[Math.floor(Math.random() * repairTimes.length)];
+  }
+
+  function askPlayerChoiceModal(roll) {
+    return new Promise((resolve) => {
+      const modal = document.getElementById('choiceModal');
+      const choiceText = document.getElementById('choiceText');
+      const riskBtn = document.getElementById('riskBtn');
+      const safeBtn = document.getElementById('safeBtn');
+      choiceText.textContent = `You rolled a ${roll}! Do you want to move ${roll} spaces and risk damage, or move 2 safely?`;
+      modal.style.display = 'flex';
+      riskBtn.onclick = () => { modal.style.display = 'none'; resolve(roll); };
+      safeBtn.onclick = () => { modal.style.display = 'none'; resolve(2); };
+    });
+  }
+  function animateDiceRoll(finalValue) {
+    return new Promise((resolve) => {
+      let count = 0;
+      diceAnimation.style.display = 'block';
+      const interval = setInterval(() => {
+        const randomFace = Math.floor(Math.random() * 6) + 1;
+        diceAnimation.textContent = `🎲 ${randomFace}`;
+        count++;
+        if (count > 8) {
+          clearInterval(interval);
+          diceAnimation.textContent = `🎲 ${finalValue}`;
+          setTimeout(() => { diceAnimation.style.display = 'none'; resolve(); }, 400);
+        }
+      }, 100);
+    });
+  }
+  rollBtn.addEventListener('click', async () => {
+    if (gameOver) return;
+    if (flightDice > 0) {
+      const roll = Math.floor(Math.random() * 6) + 1;
+      await animateDiceRoll(roll);
+
+      // Check if roll is blocked due to damage
+      if (roll <= planeDamage) {
+        statusMessage.textContent = `Your plane is too damaged! Rolled ${roll}, but damage is ${planeDamage}. No movement!`;
+        damageStatus.textContent = `Plane Damage: ${planeDamage}`
+        movesLeft = 0;
+      } else {
+        let moveSpaces = roll;
+        if (roll >= 5) {
+          moveSpaces = await askPlayerChoiceModal(roll);
+          if (moveSpaces === roll) { rollForDamage(); }
+        }
+        else {
+          damageStatus.textContent = `Plane Damage: ${planeDamage}`
+        }
+        movesLeft = moveSpaces;
+      }
+
+      flightDice--;
+      diceLeftLabel.textContent = flightDice;
+      movesLeftLabel.textContent = movesLeft;
+      timeElapsed++;  timeTracker.textContent = timeElapsed;
+    }
+    checkGameOver();
+  });
+
+  repairBtn.addEventListener('click', async () => {
+    const currentHex = hexElements[playerRow][playerCol];
+    if (!currentHex.dataset.city) return;
+
+    const repairTime = parseInt(currentHex.dataset.repairTime, 10) || 4;
+
+    if (planeDamage > 0) {
+      let multiplier = 1;
+      let rolling = true;
+      let sequence = [];
+
+      while (rolling) {
+        const roll = Math.floor(Math.random() * 6) + 1;
+        sequence.push(roll);
+        if (roll === 6) {
+          multiplier *= 2; // Double the time penalty
+        } else {
+          rolling = false; // Stop on 1-5
+        }
+      }
+
+      const totalCost = repairTime * multiplier;
+      planeDamage--;
+      timeElapsed += totalCost;
+
+      timeTracker.textContent = timeElapsed;
+      damageStatus.textContent = `Plane Damage: ${planeDamage}`;
+      statusMessage.textContent = `Repair rolls: ${sequence.join(" -> ")} | Cost: ${totalCost} time. Remaining damage: ${planeDamage}`;
+    } else {
+      statusMessage.textContent = "Plane is fully repaired!";
+    }
+  });
+
+  refuelBtn.addEventListener('click', async () => {
+    if (flightDice >= playerFuelDie) {
+      statusMessage.textContent = "Your fuel tank is already full!";
+      return;
+    }
+
+    let totalTimeCost = 0;
+    let multiplier = 1;
+    let rolling = true;
+    let sequence = [];
+
+    while (rolling) {
+      const roll = Math.floor(Math.random() * 6) + 1;
+      //animateDiceRoll(roll)
+      sequence.push(roll);
+
+      if (roll <= 4) {
+        totalTimeCost += (1 * multiplier);
+        rolling = false;
+      } else if (roll === 5) {
+        totalTimeCost += (2 * multiplier);
+        rolling = false;
+      } else if (roll === 6) {
+        // UH OH! Double all future costs
+        multiplier *= 2;
+        // keep rolling
+      }
+    }
+
+    // Apply time cost and refuel
+    timeElapsed += totalTimeCost;
+    timeTracker.textContent = timeElapsed;
+    flightDice = playerFuelDie;
+    diceLeftLabel.textContent = flightDice;
+
+    statusMessage.textContent = `Refueled! Rolls: ${sequence.join(" -> ")} | Time cost: ${totalTimeCost}`;
+  });
+  generateBiomeGrid();
+</script>
+</body>
+</html>
