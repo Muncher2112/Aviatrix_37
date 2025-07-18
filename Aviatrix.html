@@ -58,6 +58,7 @@
     border-radius: 10px;
     box-shadow: 0 0 10px rgba(0,0,0,0.5);
   }
+  
   .stat {
     display: flex;
     flex-direction: column;
@@ -107,6 +108,7 @@
     <button id="rollBtn">Roll Die</button>
     <button id="repairBtn" style="display:none;">Repair Plane</button>
     <button id="refuelBtn" style="display:none;">Refuel</button>
+    <button id="playAgainBtn" style="display:none;">Play Again</button>
   </div>
   <div id="statusMessage"></div>
   <div id="damageStatus">Plane Damage: 0</div>
@@ -134,6 +136,7 @@
   const diceAnimation = document.getElementById('diceAnimation');
   const repairBtn = document.getElementById('repairBtn');
   const refuelBtn = document.getElementById('refuelBtn');
+  const playAgainBtn = document.getElementById('playAgainBtn');
 
   const playerFuelDie = 5;
   const rows = 6, cols = 12;
@@ -141,6 +144,7 @@
   let flightDice = playerFuelDie, movesLeft = 0, planeDamage = 0, timeElapsed = 0;
   let cityPositions = [], windPositions = [], currentLevel = 1, gameOver = false, airportIndex = 0;
   let lastAirport = null; // { code, name, repairTime }
+  let justTookOff = true;
   const skyColors = ['#87ceeb', '#80c7e7', '#79c0e3', '#72b9df'];
   const airports = [
     { code: "BWI", name: "Thurgood Marshall Airport" },
@@ -238,10 +242,31 @@
     const directions = evenRow ? [[-1,0],[-1,1],[0,-1],[0,1],[1,0],[1,1]] : [[-1,-1],[-1,0],[0,-1],[0,1],[1,-1],[1,0]];
     return directions.some(([dr, dc]) => r1 + dr === r2 && c1 + dc === c2);
   }
+
   function checkGameOver() {
     const onCity = cityPositions.some(([r,c]) => r === playerRow && c === playerCol);
-    if (flightDice === 0 && movesLeft === 0 && !onCity) { gameOver = true; statusMessage.textContent = "Game Over! You're out of fuel."; }
+    if (flightDice === 0 && movesLeft === 0 && !onCity) {
+      gameOver = true;
+      statusMessage.textContent = "Game Over! You're out of fuel.";
+      playAgainBtn.style.display = 'inline-block';
+    }
   }
+
+  function checkWinCondition() {
+    if (currentLevel > 13) {
+      gameOver = true;
+      if (timeElapsed < 360) {
+        statusMessage.textContent = "🏆 You Win! True Ending (Under 360 Time Units)";
+      } else {
+        statusMessage.textContent = "🏆 You Win! Bad Ending (Over 360 Time Units)";
+      }
+      rollBtn.style.display = 'none';
+      repairBtn.style.display = 'none';
+      refuelBtn.style.display = 'none';
+      playAgainBtn.style.display = 'inline-block';
+    }
+  }
+
   function setupHexEvents() {
     hexElements.forEach((row, r) => row.forEach((hex, c) => {
       hex.addEventListener('click', async () => {
@@ -278,14 +303,30 @@
           }
           if (hex.dataset.wind === 'true') { flightDice = Math.min(flightDice + 1, 5); diceLeftLabel.textContent = flightDice; movesLeft = 0; movesLeftLabel.textContent = movesLeft;}
           if (playerCol === cols - 1) {
-            currentLevel++; levelTracker.textContent = currentLevel;
-            statusMessage.textContent = "Reached the rightmost column! Level " + currentLevel;
-            const currentRow = playerRow; generateBiomeGrid(); playerRow = currentRow; playerCol = 0; placePlayerAtHex(playerRow, playerCol); return;
-          }
+              currentLevel++; 
+              levelTracker.textContent = currentLevel;
+              
+              if (currentLevel > 13) {
+                checkWinCondition();
+                return;
+              }
+              
+              statusMessage.textContent = "Reached the rightmost column! Level " + currentLevel;
+              const currentRow = playerRow;
+              generateBiomeGrid();
+              playerRow = currentRow;
+              playerCol = 0;
+              placePlayerAtHex(playerRow, playerCol);
+              return;
+            }
           checkGameOver();
         }
       });
     }));
+    // Show takeoff message if first roll after landing
+    if (justTookOff) {
+      statusMessage.textContent = "🛫 TAKEOFF!";
+    }
   }
 
   async function rollForDamage() {
@@ -299,7 +340,7 @@
       await animateDiceRoll(damageRoll);
       rolls.push(damageRoll);
 
-      if (damageRoll <= 2) {
+      if (damageRoll <= 3) {
         // No damage on 1-2 unless escalated
         if (stage > 1) totalDamage += (stage - 1);
         escalate = false;
@@ -337,39 +378,27 @@
       statusMessage.textContent = `Landing roll: ${landingRoll}. Checking for landing damage...`;
       await landingDamageLoop();
     }
+    justTookOff = true;
   }
 
   async function crashLandingRoll() {
-    let potentialDamage = 0;
-    let rolling = true;
     let messages = [];
+    let roll = Math.floor(Math.random() * 6) + 1;
+    await animateDiceRoll(roll);
+    messages.push(roll);
 
-    while (rolling) {
-      const roll = Math.floor(Math.random() * 6) + 1;
-      await animateDiceRoll(roll);
-      messages.push(roll);
-
-      if (roll === 1 && planeDamage === 0) {
-        // Only safe if the plane has zero existing damage
-        rolling = false;
-      } else if (roll === 1 && planeDamage > 0) {
-        // With damage, 1 is treated as failure (cannot safely crash land)
-        potentialDamage += 1;
-        rolling = false;
-      } else {
-        // 2-6 means damage
-        potentialDamage += 1;
-        rolling = false;
-      }
-    }
-
-    if (potentialDamage > 0) {
-      planeDamage += potentialDamage;
-      damageStatus.textContent = `Plane Damage: ${planeDamage}`;
-      statusMessage.textContent = `Crash landing rolls: ${messages.join(" -> ")} | +${potentialDamage} Damage!`;
+    if (roll === 1 && planeDamage === 0) {
+      // Miraculous safe crash landing (only if no existing damage)
+      statusMessage.textContent = `Crash landing roll: ${roll} | Miraculously No Damage!`;
+    } else if (roll === 5 || roll === 6) {
+      statusMessage.textContent = `Crash landing roll: ${roll} | Rolling for Damage Twice!`;
+      await landingDamageLoop();
+      await landingDamageLoop();
     } else {
-      statusMessage.textContent = `Crash landing rolls: ${messages.join(" -> ")} | Miraculously no damage!`;
+      statusMessage.textContent = `Crash landing roll: ${roll} | Rolling for Damage!`;
+      await landingDamageLoop();
     }
+    justTookOff = true;
   }
   
   async function landingDamageLoop() {
@@ -446,27 +475,35 @@
       const roll = Math.floor(Math.random() * 6) + 1;
       await animateDiceRoll(roll);
 
-      // Check if roll is blocked due to damage
+      // Check if player is flying low (but not on first takeoff)
+      const isFlyingLow = (playerRow >= rows - 2 && !justTookOff);
+
       if (roll <= planeDamage) {
         statusMessage.textContent = `Your plane is too damaged! Rolled ${roll}, but damage is ${planeDamage}. No movement!`;
-        damageStatus.textContent = `Plane Damage: ${planeDamage}`
+        damageStatus.textContent = `Plane Damage: ${planeDamage}`;
+        movesLeft = 0;
+      } else if (isFlyingLow && (roll === 5 || roll === 6)) {
+        statusMessage.textContent = `⚠️ Flying Low! Rolled ${roll}, but no movement. Checking for damage...`;
+        await rollForDamage();
         movesLeft = 0;
       } else {
+        // Normal roll
         let moveSpaces = roll;
         if (roll >= 5) {
           moveSpaces = await askPlayerChoiceModal(roll);
-          if (moveSpaces === roll) { rollForDamage(); }
-        }
-        else {
-          damageStatus.textContent = `Plane Damage: ${planeDamage}`
+          if (moveSpaces === roll) { await rollForDamage(); }
+        } else {
+          damageStatus.textContent = `Plane Damage: ${planeDamage}`;
         }
         movesLeft = moveSpaces;
+        justTookOff = false;
       }
 
       flightDice--;
       diceLeftLabel.textContent = flightDice;
       movesLeftLabel.textContent = movesLeft;
-      timeElapsed++;  timeTracker.textContent = timeElapsed;
+      timeElapsed++;
+      timeTracker.textContent = timeElapsed;
     }
     checkGameOver();
   });
@@ -541,6 +578,38 @@
 
     statusMessage.textContent = `Refueled! Rolls: ${sequence.join(" -> ")} | Time cost: ${totalTimeCost}`;
   });
+
+  playAgainBtn.addEventListener('click', () => {
+  // Reset all variables
+  playerRow = rows - 1;
+  playerCol = 0;
+  flightDice = playerFuelDie;
+  movesLeft = 0;
+  planeDamage = 0;
+  timeElapsed = 0;
+  currentLevel = 1;
+  gameOver = false;
+  lastAirport = null;
+  airportIndex = 0;  // Reset airport array index
+
+  // Reset UI
+  diceLeftLabel.textContent = flightDice;
+  movesLeftLabel.textContent = movesLeft;
+  levelTracker.textContent = currentLevel;
+  timeTracker.textContent = timeElapsed;
+  damageStatus.textContent = `Plane Damage: ${planeDamage}`;
+  statusMessage.textContent = "";
+
+  // Show controls again
+  rollBtn.style.display = 'inline-block';
+  repairBtn.style.display = 'none';
+  refuelBtn.style.display = 'none';
+  playAgainBtn.style.display = 'none';
+
+  // Regenerate the grid
+  generateBiomeGrid();
+  });
+
   generateBiomeGrid();
 </script>
 </body>
