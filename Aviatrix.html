@@ -598,6 +598,7 @@
         if (isDouble34) {
           statusMessage.textContent = `Rolled ${lastRoll} then ${roll}. In-flight turbulence! Checking for damage...`;
           await rollForDamage();
+          lastRoll = null
         }
         let moveSpaces = roll;
         if (roll >= 5) {
