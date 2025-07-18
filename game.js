@@ -23,6 +23,7 @@ let lastAirport = null;
 let justTookOff = true;
 let lastRoll = null;
 let isRolling = false;
+let plane = null
 // End global vars
 
 const skyColors = ['#87ceeb', '#80c7e7', '#79c0e3', '#72b9df'];
@@ -64,6 +65,41 @@ function randomTerrain() {
 function isTooClose(arr, r, c, minDist) {
     return arr.some(([cr, cc]) => Math.abs(cr - r) + Math.abs(cc - c) < minDist);
 }
+
+function rollFromTable(table, roll) {
+    const entry = table.find(e => roll >= e.range[0] && roll <= e.range[1]);
+    return entry ? entry.outcome : null;
+}
+
+function resolveOutcome(outcome) {
+    switch (outcome) {
+        case OUTCOMES.SAFE:
+            showMessage("Safe!");
+            break;
+        case OUTCOMES.SUCCESS:
+            showMessage("Success!");
+            break;
+        case OUTCOMES.FAIL:
+            showMessage("Failed!");
+            // Add any logic for failed takeoff
+            break;
+        case OUTCOMES.DAMAGE:
+            enterDamageLoop();
+            break;
+        case OUTCOMES.DAMAGE_STOP:
+            enterDamageLoop();
+            movesLeft = 0
+            break;
+        case OUTCOMES.STOP:
+            movesLeft = 0
+            break;
+        case OUTCOMES.DOUBLE_DAMAGE:
+            enterDamageLoop();
+            enterDamageLoop(); // Twice
+            break;
+    }
+}
+
 function generateBiomeGrid() {
     clearGrid();
     for (let r = 0; r < rows; r++) {
@@ -347,37 +383,61 @@ function showMovementAnimation(amount) {
 
 rollBtn.addEventListener('click', async () => {
     if (gameOver || isRolling) return;
+    let do_normal_action = false
+    console.debug("WE AREHERE: ", flightDice)
     if (flightDice > 0) {
         isRolling = true;
         const roll = Math.floor(Math.random() * 6) + 1;
         await animateDiceRoll(roll);
+        if (plane === null){
+            console.debug("PLANE WAS NOT SET SETTING PLANE: ", window.SelectedPlane)
+            
+            plane = window.SelectedPlane;
+        }
         const isFlyingLow = (playerRow >= rows - 2 && !justTookOff);
         let isDouble34 = (roll === 3 && lastRoll === 3);
         if (roll === 4 && lastRoll === 4) {
-            isDouble34 = true
+            isDouble34 = true;
         }
+        // Check if plane is too damaged to move
         if (roll <= planeDamage) {
             statusMessage.textContent = `Your plane is too damaged! Rolled ${roll}, but damage is ${planeDamage}. No movement!`;
             movesLeft = 0;
-        } else if (isFlyingLow && (roll === 5 || roll === 6)) {
-            statusMessage.textContent = `⚠️ Flying Low! Rolled ${roll}, but no movement. Checking for damage...`;
-            await rollForDamage();
-            movesLeft = 0;
+        }
+        // Check flying low outcome
+        else if (isFlyingLow) {
+            const outcome = rollFromTable(plane.flyLowTable, roll);
+            if (outcome === OUTCOMES.SAFE) {
+                do_normal_action = true
+                // Safe - movement allowed
+            } else if (outcome === OUTCOMES.DAMAGE_STOP) {
+                statusMessage.textContent = `⚠️ Flying Low! Rolled ${roll}, but no movement. Checking for damage...`;
+                await rollForDamage();
+                movesLeft = 0;
+            }
         } else {
+            do_normal_action = true
+        }
+        if (do_normal_action) {
+            // Double 3 or 4 turbulence
             if (isDouble34) {
                 statusMessage.textContent = `Rolled ${lastRoll} then ${roll}. In-flight turbulence! Checking for damage...`;
                 await rollForDamage();
-                lastRoll = null
+                lastRoll = null;
             }
             let moveSpaces = roll;
+            // For high rolls (5 or 6), check in-flight table
             if (roll >= 5) {
-                moveSpaces = await askPlayerChoiceModal(roll);
-                if (moveSpaces === roll) { await rollForDamage(); }
+                const outcome = rollFromTable(plane.takeOffTable, roll);
+                if (outcome === OUTCOMES.DAMAGE) {
+                    moveSpaces = await askPlayerChoiceModal(roll);
+                    if (moveSpaces === roll) { await rollForDamage(); }
+                }
             }
-            showMovementAnimation(moveSpaces)
+            showMovementAnimation(moveSpaces);
             movesLeft = moveSpaces;
             justTookOff = false;
-            lastRoll = roll; // Save this roll for next turn
+            lastRoll = roll;
         }
         flightDice--;
         diceLeftLabel.textContent = flightDice;

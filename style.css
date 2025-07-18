@@ -227,3 +227,19 @@ button { padding: 5px 10px; font-size: 16px; cursor: pointer; border-radius: 5px
 .plane-card h3 {
   color: #ffd700;
 }
+
+.plane-chart {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 12px;
+}
+.plane-chart th, .plane-chart td {
+  border: 1px solid #555;
+  padding: 3px;
+  text-align: center;
+}
+.plane-chart th {
+  background: #444;
+  color: #ffd700;
+}

@@ -1,34 +1,95 @@
+const OUTCOMES = {
+  SAFE: "safe",         // No problems
+  DAMAGE: "damage",     // Trigger damage loop
+  DAMAGE_STOP: "damage_stop", // No movement and damage
+  DOUBLE_DAMAGE : "double_damage", // Double damage rolls
+  EXPLODE: "explode",   // Plane destroyed
+  FAIL: "fail",         // Failed action (e.g., can't take off)
+  SUCCESS: "success",   // Successful action (e.g., take off succeeded)
+  LOSE_FUEL: "loseFuel" // Lose fuel event
+};
+
 const planes = [
   {
     name: "Douglas DC-2",
-    desc: "Balanced performance.",
-    takeoffMod: 0,
-    inflightMod: 0,
-    landingMod: 0,
-    fuelDice: 5,
-    crashLandingMod: 0
+    desc: "A standard straight flier.",
+    fuelDice : 5,
+    takeOffTable: [
+      { range: [1, 4], outcome: OUTCOMES.SUCCESS },
+      { range: [5, 6], outcome: OUTCOMES.DAMAGE }
+    ],
+    flyLowTable: [
+      { range: [1, 4], outcome: OUTCOMES.SAFE },
+      { range: [5, 6], outcome: OUTCOMES.DAMAGE_STOP }
+    ],
+    inFlightTable: [
+      { range: [1, 5], outcome: OUTCOMES.SAFE },
+      { range: [5, 6], outcome: OUTCOMES.DAMAGE }
+    ],
+    landingTable: [
+      { range: [1, 4], outcome: OUTCOMES.SAFE },
+      { range: [5, 6], outcome: OUTCOMES.DAMAGE }
+    ],
+    crashLandingTable: [
+      { range: [1, 1], outcome: OUTCOMES.SAFE },
+      { range: [2, 4], outcome: OUTCOMES.DAMAGE },
+      { range: [5, 6], outcome: OUTCOMES.DOUBLE_DAMAGE }
+    ]
   },
   {
     name: "Boeing 247",
-    desc: "Better take-off and flight, but worse landing and crashlanding.",
-    takeoffMod: 1,
-    inflightMod: 1,
-    landingMod: -1,
-    fuelDice: 5,
-    crashLandingMod: -1
+    desc: "A steady flier, but not good at landing in a pinch.",
+    fuelDice : 5,
+    takeOffTable: [
+      { range: [1, 4], outcome: OUTCOMES.SUCCESS },
+      { range: [5, 6], outcome: OUTCOMES.DAMAGE }
+    ],
+    flyLowTable: [
+      { range: [1, 4], outcome: OUTCOMES.SAFE },
+      { range: [5, 6], outcome: OUTCOMES.DAMAGE_STOP }
+    ],
+    inFlightTable: [
+      { range: [1, 5], outcome: OUTCOMES.SAFE },
+      { range: [5, 6], outcome: OUTCOMES.DAMAGE }
+    ],
+    landingTable: [
+      { range: [1, 4], outcome: OUTCOMES.SAFE },
+      { range: [5, 6], outcome: OUTCOMES.DAMAGE }
+    ],
+    crashLandingTable: [
+      { range: [1, 1], outcome: OUTCOMES.SAFE },
+      { range: [2, 4], outcome: OUTCOMES.DAMAGE },
+      { range: [5, 6], outcome: OUTCOMES.DOUBLE_DAMAGE }
+    ]
   },
   {
     name: "Brewster F2A Buffalo",
-    desc: "One less fuel die, but hardy and easy to land.",
-    takeoffMod: 0,
-    inflightMod: 1,
-    landingMod:  2,
-    fuelDice: 4,
-    crashLandingMod: 2
+    desc: "A small robust plane with a smaller fuel tank.",
+    fuelDice : 4,
+    takeOffTable: [
+      { range: [1, 4], outcome: OUTCOMES.SUCCESS },
+      { range: [5, 6], outcome: OUTCOMES.DAMAGE }
+    ],
+    flyLowTable: [
+      { range: [1, 4], outcome: OUTCOMES.SAFE },
+      { range: [5, 6], outcome: OUTCOMES.DAMAGE_STOP }
+    ],
+    inFlightTable: [
+      { range: [1, 5], outcome: OUTCOMES.SAFE },
+      { range: [5, 6], outcome: OUTCOMES.DAMAGE }
+    ],
+    landingTable: [
+      { range: [1, 5], outcome: OUTCOMES.SAFE },
+      { range: [6, 6], outcome: OUTCOMES.DAMAGE }
+    ],
+    crashLandingTable: [
+      { range: [1, 2], outcome: OUTCOMES.SAFE },
+      { range: [3, 5], outcome: OUTCOMES.DAMAGE },
+      { range: [6, 6], outcome: OUTCOMES.DOUBLE_DAMAGE }
+    ]
   }
 ];
-
-let selectedPlane = null;
+window.SelectedPlane = null;
 
 function showPlaneSelection() {
   const modal = document.getElementById('planeSelection');
@@ -41,11 +102,31 @@ function showPlaneSelection() {
     card.innerHTML = `
       <h3>${plane.name}</h3>
       <p>${plane.desc}</p>
-      <p>Fuel Dice: ${plane.fuelDice}</p>
-      <p>Takeoff Mod: ${plane.takeoffMod}, Landing Mod: ${plane.landingMod}</p>
+      <p><strong>Fuel Dice:</strong> ${plane.fuelDice}</p>
+      <table class="plane-chart">
+        <thead>
+          <tr>
+            <th>Action \\ Roll</th>
+            <th>1</th>
+            <th>2</th>
+            <th>3</th>
+            <th>4</th>
+            <th>5</th>
+            <th>6</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${createChartRow("Takeoff", plane.takeOffTable)}
+          ${createChartRow("Fly Low", plane.flyLowTable)}
+          ${createChartRow("In Flight", plane.inFlightTable)}
+          ${createChartRow("Landing", plane.landingTable)}
+          ${createChartRow("Crash Landing", plane.crashLandingTable)}
+        </tbody>
+      </table>
     `;
     card.addEventListener('click', () => {
-      selectedPlane = plane;
+      window.SelectedPlane = plane;
+      console.debug("THIS IS OUR PLANE: ", window.SelectedPlane)
       modal.style.display = 'none';
       initializeGame();
     });
@@ -56,11 +137,66 @@ function showPlaneSelection() {
 }
 
 function initializeGame() {
-  flightDice = selectedPlane.fuelDice;
+  flightDice = window.SelectedPlane.fuelDice;
   document.getElementById('diceLeft').textContent = flightDice;
-  document.getElementById('statusMessage').textContent = `Selected Plane: ${selectedPlane.name}`;
-  document.getElementById('planeName').textContent = selectedPlane.name;
+  document.getElementById('statusMessage').textContent = `Selected Plane: ${window.SelectedPlane.name}`;
+  document.getElementById('planeName').textContent = window.SelectedPlane.name;
+  flightDice = window.SelectedPlane.fuelDice;
   generateBiomeGrid();
 }
 
 document.addEventListener('DOMContentLoaded', showPlaneSelection);
+
+
+function selectPlane(index) {
+    SelectedPlane = planes[index];
+}
+
+function getSelectedPlane() {
+    return SelectedPlane;
+}
+
+window.getPlaneByName = function(name) {
+  return SelectedPlane;
+};
+
+// Make sure to attach it globally:
+window.getSelectedPlane = getSelectedPlane;
+
+const OUTCOME_ICONS = {
+  safe: "✅",
+  damage: "⚠️",
+  damage_stop: "🛑",
+  double_damage: "💥",
+  explode: "☠️",
+  fail: "❌",
+  success: "✈️",
+  loseFuel: "⛽⬇️"
+};
+
+function createChartRow(label, table) {
+  const outcomes = Array(6).fill("");
+
+  table.forEach(row => {
+    const [start, end] = row.range;
+    for (let i = start; i <= end; i++) {
+      let cellContent = OUTCOME_ICONS[row.outcome] || row.outcome;
+
+      // Replace safe with movement number for specific rows
+      if ((label === "In Flight" || label === "Fly Low") && row.outcome === OUTCOMES.SAFE) {
+        cellContent = `+${i}`; // Example: Movement equals the dice roll
+      }
+      if ((label === "Takeoff") && row.outcome === OUTCOMES.SUCCESS) {
+        cellContent = `+${i}`; // Example: Movement equals the dice roll
+      }
+      outcomes[i - 1] = cellContent;
+    }
+  });
+
+  return `
+    <tr>
+      <td><strong>${label}</strong></td>
+      ${outcomes.map(outcome => `<td>${outcome}</td>`).join("")}
+    </tr>
+  `;
+}
