@@ -12,7 +12,7 @@ const OUTCOMES = {
 const planes = [
   {
     name: "Douglas DC-2",
-    desc: "A standard straight flier.",
+    desc: "A good lander, but sometimes has engine trouble.",
     fuelDice : 5,
     takeOffTable: [
       { range: [1, 4], outcome: OUTCOMES.SUCCESS },
@@ -23,16 +23,16 @@ const planes = [
       { range: [5, 6], outcome: OUTCOMES.DAMAGE_STOP }
     ],
     inFlightTable: [
-      { range: [1, 5], outcome: OUTCOMES.SAFE },
-      { range: [5, 6], outcome: OUTCOMES.DAMAGE }
+      { range: [1, 3], outcome: OUTCOMES.SAFE },
+      { range: [4, 6], outcome: OUTCOMES.DAMAGE }
     ],
     landingTable: [
-      { range: [1, 4], outcome: OUTCOMES.SAFE },
-      { range: [5, 6], outcome: OUTCOMES.DAMAGE }
+      { range: [1, 5], outcome: OUTCOMES.SAFE },
+      { range: [6, 6], outcome: OUTCOMES.DAMAGE }
     ],
     crashLandingTable: [
       { range: [1, 1], outcome: OUTCOMES.SAFE },
-      { range: [2, 4], outcome: OUTCOMES.DAMAGE },
+      { range: [2, 5], outcome: OUTCOMES.DAMAGE },
       { range: [5, 6], outcome: OUTCOMES.DOUBLE_DAMAGE }
     ]
   },
@@ -50,16 +50,15 @@ const planes = [
     ],
     inFlightTable: [
       { range: [1, 5], outcome: OUTCOMES.SAFE },
-      { range: [5, 6], outcome: OUTCOMES.DAMAGE }
+      { range: [6, 6], outcome: OUTCOMES.DAMAGE }
     ],
     landingTable: [
-      { range: [1, 4], outcome: OUTCOMES.SAFE },
-      { range: [5, 6], outcome: OUTCOMES.DAMAGE }
+      { range: [1, 3], outcome: OUTCOMES.SAFE },
+      { range: [4, 6], outcome: OUTCOMES.DAMAGE }
     ],
     crashLandingTable: [
-      { range: [1, 1], outcome: OUTCOMES.SAFE },
-      { range: [2, 4], outcome: OUTCOMES.DAMAGE },
-      { range: [5, 6], outcome: OUTCOMES.DOUBLE_DAMAGE }
+      { range: [1, 3], outcome: OUTCOMES.DAMAGE },
+      { range: [4, 6], outcome: OUTCOMES.DOUBLE_DAMAGE }
     ]
   },
   {
@@ -70,9 +69,9 @@ const planes = [
       { range: [1, 4], outcome: OUTCOMES.SUCCESS },
       { range: [5, 6], outcome: OUTCOMES.DAMAGE }
     ],
-    flyLowTable: [
-      { range: [1, 4], outcome: OUTCOMES.SAFE },
-      { range: [5, 6], outcome: OUTCOMES.DAMAGE_STOP }
+    flyLowTable: [  
+      { range: [1, 5], outcome: OUTCOMES.SAFE },
+      { range: [6, 6], outcome: OUTCOMES.DAMAGE_STOP }
     ],
     inFlightTable: [
       { range: [1, 5], outcome: OUTCOMES.SAFE },
@@ -142,7 +141,7 @@ function initializeGame() {
   document.getElementById('statusMessage').textContent = `Selected Plane: ${window.SelectedPlane.name}`;
   document.getElementById('planeName').textContent = window.SelectedPlane.name;
   flightDice = window.SelectedPlane.fuelDice;
-  generateBiomeGrid();
+  //enerateBiomeGrid();
 }
 
 document.addEventListener('DOMContentLoaded', showPlaneSelection);

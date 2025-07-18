@@ -134,6 +134,7 @@ function generateBiomeGrid() {
                 hex.innerHTML = `${lastAirport.code}<br>(${lastAirport.repairTime})`;
                 hex.title = `${lastAirport.name} - Repair: ${lastAirport.repairTime} time units`;
                 cityPositions.push([r, c]);
+                lastAirport = null
             }
             row.appendChild(hex); rowHexes.push(hex);
         }
@@ -188,9 +189,11 @@ function setupHexEvents() {
                     movesLeftLabel.textContent = movesLeft;
                     if (flightDice > 0) {
                         await rollForLanding();
+                        lastRoll = null;
                     } else {
                         statusMessage.textContent = "⚠️ Crash Landing!";
                         await crashLandingRoll()
+                        lastRoll = null;
                     }
                     diceLeftLabel.textContent = flightDice;
                     repairBtn.style.display = 'inline-block';
@@ -272,32 +275,38 @@ async function rollForDamage() {
 async function rollForLanding() {
     const landingRoll = Math.floor(Math.random() * 6) + 1;
     await animateDiceRoll(landingRoll);
-    if (landingRoll <= planeDamage) {
-        statusMessage.textContent = `Landing roll ${landingRoll} <= damage ${planeDamage}. Forced landing damage check!`;
-        await landingDamageLoop();
-    } else if (landingRoll <= 4) {
-        statusMessage.textContent = `Landing roll: ${landingRoll}. Landed safely!`;
-    } else {
-        statusMessage.textContent = `Landing roll: ${landingRoll}. Checking for landing damage...`;
-        await landingDamageLoop();
+
+    const landingResult = rollFromTable(plane.landingTable, landingRoll);
+    if (landingResult) {
+        statusMessage.textContent = `Landing roll: ${landingRoll}. ${landingResult}`;
+        if (landingResult=== OUTCOMES.DAMAGE) {
+            await landingDamageLoop();
+        } else{
+            statusMessage.textContent = `Landing roll: ${landingRoll}. Landed safely!`;
+        }
     }
     justTookOff = true;
 }
+
 async function crashLandingRoll() {
-    let roll = Math.floor(Math.random() * 6) + 1;
+    const roll = Math.floor(Math.random() * 6) + 1;
     await animateDiceRoll(roll);
-    if (roll === 1 && planeDamage === 0) {
-        statusMessage.textContent = `Crash landing roll: ${roll} | Miraculously No Damage!`;
-    } else if (roll === 5 || roll === 6) {
-        statusMessage.textContent = `Crash landing roll: ${roll} | Rolling for Damage Twice!`;
-        await landingDamageLoop();
-        await landingDamageLoop();
-    } else {
-        statusMessage.textContent = `Crash landing roll: ${roll} | Rolling for Damage!`;
-        await landingDamageLoop();
+
+    const crashResult = rollFromTable(plane.crashLandingTable, roll);
+    if (crashResult) {
+        statusMessage.textContent = `Crash landing roll: ${roll}`;
+        if (crashResult === OUTCOMES.DAMAGE) {
+            await landingDamageLoop();
+        } else if (crashResult === OUTCOMES.DOUBLE_DAMAGE) {
+            await landingDamageLoop();
+            await landingDamageLoop();
+        } else {
+            // safe or other results
+        }
     }
     justTookOff = true;
 }
+
 async function landingDamageLoop() {
     let potentialDamage = 0;
     let rolling = true;
@@ -328,10 +337,22 @@ async function landingDamageLoop() {
 function getCitySpawnChance() {
     return Math.max(0.2, 0.4 - (currentLevel - 1) * 0.05);
 }
+
 function getRandomRepairTime() {
     const repairTimes = [4, 6, 8, 10, 16, 24];
-    return repairTimes[Math.floor(Math.random() * repairTimes.length)];
+    
+    // Weight toward smaller times early on
+    let bias = Math.min(currentLevel / 10, 1); 
+    // 0 at level 1, gradually approaching 1 by level 10
+
+    // Weighted index selection
+    let random = Math.pow(Math.random(), 1.5 - bias);  
+    // Early levels favor low values (power < 1)
+
+    let index = Math.floor(random * repairTimes.length);
+    return repairTimes[index];
 }
+
 function askPlayerChoiceModal(roll) {
     return new Promise((resolve) => {
         const modal = document.getElementById('choiceModal');
@@ -384,14 +405,11 @@ function showMovementAnimation(amount) {
 rollBtn.addEventListener('click', async () => {
     if (gameOver || isRolling) return;
     let do_normal_action = false
-    console.debug("WE AREHERE: ", flightDice)
     if (flightDice > 0) {
         isRolling = true;
         const roll = Math.floor(Math.random() * 6) + 1;
         await animateDiceRoll(roll);
         if (plane === null){
-            console.debug("PLANE WAS NOT SET SETTING PLANE: ", window.SelectedPlane)
-            
             plane = window.SelectedPlane;
         }
         const isFlyingLow = (playerRow >= rows - 2 && !justTookOff);
@@ -428,7 +446,13 @@ rollBtn.addEventListener('click', async () => {
             let moveSpaces = roll;
             // For high rolls (5 or 6), check in-flight table
             if (roll >= 5) {
-                const outcome = rollFromTable(plane.takeOffTable, roll);
+                let outcome;
+                if (justTookOff) {
+                    outcome = rollFromTable(plane.takeOffTable, roll);
+                } else {
+                     outcome = rollFromTable(plane.inFlightTable, roll);
+                }
+                
                 if (outcome === OUTCOMES.DAMAGE) {
                     moveSpaces = await askPlayerChoiceModal(roll);
                     if (moveSpaces === roll) { await rollForDamage(); }
@@ -456,22 +480,15 @@ repairBtn.addEventListener('click', async () => {
     if (planeDamage > 0) {
         let multiplier = 1;
         let rolling = true;
-        let sequence = [];
-        while (rolling) {
-            const roll = Math.floor(Math.random() * 6) + 1;
-            sequence.push(roll);
-            if (roll === 6) {
-                multiplier *= 2;
-            } else {
-                rolling = false;
-            }
-        }
-        const totalCost = repairTime * multiplier;
+        const repairRoll = Math.floor(Math.random() * 6) + 1;
+        await animateDiceRoll(repairRoll);
+
+        const totalCost = repairTime * repairRoll;
         planeDamage--;
         planeDamageLabel.textContent = planeDamage;
         timeElapsed += totalCost;
         timeTracker.textContent = timeElapsed;
-        statusMessage.textContent = `Repair rolls: ${sequence.join(" -> ")} | Cost: ${totalCost} time. Remaining damage: ${planeDamage}`;
+        statusMessage.textContent = `Repair roll: ${repairRoll} | Cost: ${totalCost} time (${repairRoll} * ${repairTime}). Remaining damage: ${planeDamage}`;
     } else {
         statusMessage.textContent = "Plane is fully repaired!";
     }
@@ -526,6 +543,7 @@ playAgainBtn.addEventListener('click', () => {
     repairBtn.style.display = 'none';
     refuelBtn.style.display = 'none';
     playAgainBtn.style.display = 'none';
+    showPlaneSelection()
     generateBiomeGrid();
 });
 generateBiomeGrid();
