@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aviatrix</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="game-panel">
+    <div class="panel-title">Game Info</div>
+    <div class="stat">Level<br><span id="levelTracker">1</span></div>
+    <div class="stat">Time<br><span id="timeTracker">0</span></div>
+  </div>
+
+  <div class="plane-panel">
+    <div class="panel-title">✈️ Your Plane</div>
+    <select id="planeSelector">
+      <option>Douglas DC-2</option>
+      <option>Boeing 247</option>
+      <option>Brewster F2A Buffalo</option>
+    </select>
+    <div class="stat">Flight Dice<br><span id="diceLeft">5</span></div>
+    <div class="stat">Moves Left<br><span id="movesLeft">0</span></div>
+    <div class="stat">Damage<br><span id="planeDamage">0</span></div>
+    <button id="repairBtn" style="display:none;">Repair Plane</button>
+    <button id="refuelBtn" style="display:none;">Refuel</button>
+    <button id="playAgainBtn" style="display:none;">Play Again</button>
+  </div>
+
+  <div class="roll-panel">
+    <button id="rollBtn">Roll Die</button>
+  </div>
+
+  <div id="statusMessage"></div>
+  <div class="hex-grid" id="hexGrid">
+    <div class="player" id="player">✈️</div>
+  </div>
+
+  <div id="diceAnimation">🎲</div>
+  <div id="choiceModal">
+    <div>
+      <p id="choiceText"></p>
+      <button id="riskBtn">Risk It</button>
+      <button id="safeBtn">Play Safe</button>
+    </div>
+  </div>
+
+  <div id="fuelGainAnimation" style="display:none;">+1 Fuel!</div>
+  <div id="damageAnimation" style="display:none;">+1 Damage!</div>
+  <div id="movementAnimation" style="display:none;">+1 Damage!</div>
+
+  <script src="planes.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
