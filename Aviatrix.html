@@ -48,6 +48,7 @@
     transform: translate(-50%, -50%);
     pointer-events: none;
     z-index: 2;
+    text-shadow: 2px 2px 0 black, -2px 2px 0 black, 2px -2px 0 black, -2px -2px 0 black;
   }
   .panel {
     background: #333;
@@ -168,6 +169,25 @@
   20% { opacity: 1; transform: translate(-50%, -60%) scale(1.2); }
   100% { opacity: 0; transform: translate(-50%, -80%) scale(1); }
 }
+
+#movementAnimation {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 40px;
+  color: #e8ff18;
+  font-weight: bold;
+  text-shadow: 2px 2px 0 black;
+  display: none;
+  z-index: 30;
+}
+
+@keyframes movementPop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  20% { opacity: 1; transform: translate(-50%, -60%) scale(1.2); }
+  100% { opacity: 0; transform: translate(-50%, -80%) scale(1); }
+}
 </style>
 </head>
 <body>
@@ -206,6 +226,7 @@
   </div>
   <div id="fuelGainAnimation" style="display:none;">+1 Fuel!</div>
   <div id="damageAnimation" style="display:none;">+1 Damage!</div>
+  <div id="movementAnimation" style="display:none;">+1 Damage!</div>
 <script>
   const grid = document.getElementById('hexGrid');
   const player = document.getElementById('player');
@@ -544,6 +565,16 @@
       setTimeout(() => { fuelAnim.style.display = 'none'; }, 1000);
   }
 
+  function showMovementAnimation(amount) {
+      const fuelAnim = document.getElementById('movementAnimation');
+      fuelAnim.style.display = 'block';
+      fuelAnim.style.animation = 'none';
+      fuelAnim.offsetHeight; // trigger reflow
+      fuelAnim.style.animation = 'fuelPop 1s ease-out';
+      document.getElementById("movementAnimation").textContent = `+${amount} Movement!`;
+      setTimeout(() => { fuelAnim.style.display = 'none'; }, 1000);
+  }
+
   rollBtn.addEventListener('click', async () => {
     if (gameOver || isRolling) return;
     if (flightDice > 0) {
@@ -551,7 +582,7 @@
       const roll = Math.floor(Math.random() * 6) + 1;
       await animateDiceRoll(roll);
       const isFlyingLow = (playerRow >= rows - 2 && !justTookOff);
-      const isDouble34 = (roll === 3 && lastRoll === 3);
+      let isDouble34 = (roll === 3 && lastRoll === 3);
       if (roll === 4 && lastRoll === 4){
         isDouble34 = true
       }
@@ -572,6 +603,7 @@
           moveSpaces = await askPlayerChoiceModal(roll);
           if (moveSpaces === roll) { await rollForDamage(); }
         }
+        showMovementAnimation(moveSpaces)
         movesLeft = moveSpaces;
         justTookOff = false;
         lastRoll = roll; // Save this roll for next turn
@@ -652,6 +684,7 @@
     gameOver = false;
     lastAirport = null;
     airportIndex = 0;
+    justTookOff = true
     diceLeftLabel.textContent = flightDice;
     movesLeftLabel.textContent = movesLeft;
     planeDamageLabel.textContent = planeDamage;
