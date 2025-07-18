@@ -59,6 +59,7 @@ function initializeGame() {
   flightDice = selectedPlane.fuelDice;
   document.getElementById('diceLeft').textContent = flightDice;
   document.getElementById('statusMessage').textContent = `Selected Plane: ${selectedPlane.name}`;
+  document.getElementById('planeName').textContent = selectedPlane.name;
   generateBiomeGrid();
 }
 
