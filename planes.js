@@ -70,11 +70,11 @@ const planes = [
       { range: [5, 6], outcome: OUTCOMES.DAMAGE }
     ],
     flyLowTable: [  
-      { range: [1, 5], outcome: OUTCOMES.SAFE },
-      { range: [6, 6], outcome: OUTCOMES.DAMAGE_STOP }
+      { range: [1, 4], outcome: OUTCOMES.SAFE },
+      { range: [5, 6], outcome: OUTCOMES.DAMAGE_STOP }
     ],
     inFlightTable: [
-      { range: [1, 5], outcome: OUTCOMES.SAFE },
+      { range: [1, 4], outcome: OUTCOMES.SAFE },
       { range: [5, 6], outcome: OUTCOMES.DAMAGE }
     ],
     landingTable: [
