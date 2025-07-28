@@ -19,11 +19,12 @@ This project is licensed under the **Creative Commons Attribution-NonCommercial 
 **Attribution requirement:**  
 Any use or derivative of this project must give clear credit to **PLAAY Games** and link back to their website and product page.
 
-`[https://plaay.com/]`
-'[https://plaay.com/shop/p/aviatrix-37]'
+https://plaay.com/
+
+https://plaay.com/shop/p/aviatrix-37
 
 Clear credit should also be given to Muncher2112, and include a link to this repository.
 
-'[https://github.com/Muncher2112/Aviatrix_37/]'
+https://github.com/Muncher2112/Aviatrix_37/
 
 For the full legal text, see the [LICENSE](LICENSE) file or visit [Creative Commons BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/).
