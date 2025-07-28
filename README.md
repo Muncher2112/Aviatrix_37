@@ -1,7 +1,7 @@
 # Aviatrix_37
 Virtual version of the board game Aviatrix.  Vibe coded using GPT4.0, as a test to see what it's capable of.
 
-Play the real game here! 
+Buy the real game here! 
 https://plaay.com/shop/plaay-now/aviatrix-37
 
 ## License
