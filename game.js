@@ -407,7 +407,8 @@ rollBtn.addEventListener('click', async () => {
     let do_normal_action = false
     if (flightDice > 0) {
         isRolling = true;
-        const roll = Math.floor(Math.random() * 6) + 1;
+        //const roll = Math.floor(Math.random() * 6) + 1;
+        roll = 4
         await animateDiceRoll(roll);
         if (plane === null){
             plane = window.SelectedPlane;
@@ -444,19 +445,17 @@ rollBtn.addEventListener('click', async () => {
                 lastRoll = null;
             }
             let moveSpaces = roll;
-            // For high rolls (5 or 6), check in-flight table
-            if (roll >= 5) {
-                let outcome;
-                if (justTookOff) {
-                    outcome = rollFromTable(plane.takeOffTable, roll);
-                } else {
-                     outcome = rollFromTable(plane.inFlightTable, roll);
-                }
-                
-                if (outcome === OUTCOMES.DAMAGE) {
-                    moveSpaces = await askPlayerChoiceModal(roll);
-                    if (moveSpaces === roll) { await rollForDamage(); }
-                }
+            // check in-flight table for any roll, as some planes can have issues even below 5 and 6
+            let outcome;
+            if (justTookOff) {
+                outcome = rollFromTable(plane.takeOffTable, roll);
+            } else {
+                outcome = rollFromTable(plane.inFlightTable, roll);
+            }
+            
+            if (outcome === OUTCOMES.DAMAGE) {
+                moveSpaces = await askPlayerChoiceModal(roll);
+                if (moveSpaces === roll) { await rollForDamage(); }
             }
             showMovementAnimation(moveSpaces);
             movesLeft = moveSpaces;
